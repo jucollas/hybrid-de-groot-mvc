@@ -1,0 +1,12 @@
+[package]
+name = "opinion_core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "opinion_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+ferris-says = "0.3.2"
+pyo3 = { version = "0.22.6", features = ["extension-module"] }

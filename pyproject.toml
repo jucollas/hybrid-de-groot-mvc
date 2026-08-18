@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "hybrid-degroot-mvc"
+version = "0.1.0"
+description = "Hybrid DeGroot opinion-network simulator with PySimpleGUI MVC and Rust/maturin compute core"
+requires-python = ">=3.10"
+dependencies = [
+  "PySimpleGUI",
+  "matplotlib",
+  "networkx",
+]
+
+[tool.maturin]
+module-name = "opinion_core"
+python-source = "."
+features = ["pyo3/extension-module"]
