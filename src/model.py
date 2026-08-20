@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+from .algorithms import TarjanSCC
+
 
 EPS = 1e-4
 
@@ -562,7 +564,7 @@ class HybridModel:
 
         return steps_copy_path
 
-    def _compute_steps_consensus_python(
+    def _compute_steps_consensus_scc(
             self,
             opinions: list[float],
             edges_indexed: list[tuple[int, int, float]],
@@ -581,8 +583,6 @@ class HybridModel:
                     ans.extend(steps_build_alpha_edge)
                     alpha = beta
                 u, v, _ = alpha
-                print(alpha)
-                print(opinions[u], opinions[v])
                 path_v_to_u = self._find_path(v, u, adj_graph)
                 steps_build_node_tao = self._build_node_tao(alpha, opinions, path_v_to_u, tao)
                 ans.extend(steps_build_node_tao)
@@ -592,6 +592,48 @@ class HybridModel:
             steps_copy_all = self._copy_opinion_all(node_tao, opinions, edges_indexed, tao)
             ans.extend(steps_copy_all)
         return ans
+
+
+    @staticmethod
+    def count_in_degree_scc(
+        sccs : list[list[int]],
+        edges: list[tuple[int, int, float]],
+    ):
+        vertex_to_scc = dict()
+        for index in range(len(sccs)):
+            for vertex in sccs[index]:
+                vertex_to_scc[vertex] = index
+
+        in_degree = [ 0 for _ in range(len(sccs))]
+        for u, v, _ in edges:
+            u_scc = vertex_to_scc[u]
+            v_scc = vertex_to_scc[v] 
+            if u_scc != v_scc:
+                in_degree[v_scc] += 1
+        
+        return in_degree
+
+    def _compute_steps_consensus_python(
+        self,
+        opinions: list[float],
+        edges_indexed: list[tuple[int, int, float]],
+        adj_graph : list[list[tuple[int, float]]],
+        tao : float,
+    ):
+        graph_without_influence = [[ v for v, _ in adj_graph[u]] for u in range(len(adj_graph))]
+        tarjan = TarjanSCC(graph_without_influence)
+        sccs = tarjan.find_sccs()
+        in_degree_scc = self.count_in_degree_scc(sccs, edges_indexed)
+        sources = [set(sccs[i]) for i in range(len(sccs)) if in_degree_scc[i] == 0]
+
+        for s in sources:
+            print(s)
+        # Grafo fe componenetes,
+        # aplicar a cada una de las fuentes para encuenren concesoso
+        # 
+        
+
+
 
 if __name__ == "__main__":
     model = HybridModel.demo()
