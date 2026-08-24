@@ -1,0 +1,7 @@
+La estrategia planteada es una variación de la estrategia S5. Se retoma la filosofia de 'tratar de llevar las opiniones al promedio', pero ahora esta se ejecuta como un problema de optimización. Si se piensa en como varia la opinion de un agente v, entonces este solo es influenciado por aristas (u,v), por lo que podemos pensar el problema de tratar de llevar la opinion del agente v al promedio como seleccionar un subconjunto de las aristas que lo influencian y tratar que lo dejen lo más cerca posible al promedio d elas opiniones. Esto es, en lineas generales, la estrategia.
+
+Los experimentos se realizaron con una variación de Barabasi-Albert. Comenzamos con un grafo de tamaño H en donde inicialmente tenemos aristas de tipo (i,i+1) y (H-1,0). Luego comenzamos a poner vertices de manera incremental hasta que obtengamos todos los vertices que se deseen. Al agregar un nuevo vertice (que asumiremos es v), se ponen 'indeg' aristas de tipo (u,v) y 'outdeg' aristas (v,u). Se puede probar que, como el grafo inicial es fuertemente conexo, si 'indeg'>0 y 'outdeg'>0 entonces el grafo resultante también será fuertemente conexo. 
+
+Para los experimentos se fijó 'outdeg' en 1 y H en 10. 'indeg' vario entre [2,4,6,10] y el tamaño del grafo vario entre [100,1000,10000]. Para cada pareja ('indeg',tamaño) se generaron 100 grafos pseudoaleatorios. 
+
+Por el momento, parece revelar una mejoria frente a transciciones tipo DeGroot y la heuristica S5 en cantidad de comunicaciones. En cuanto a tiempos/pasos hasta convergencia no parece dar ninguna mejoria.

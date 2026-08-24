@@ -1,0 +1,18 @@
+Hi jucollas. I just finished conditioning this a bit. 
+
+In 'graph.cpp' you can find how Im dealing with edges. A graph may just be represented as a tuple
+    n:amount of nodes and vector<Edge<tedge>>: a list of edges.
+
+In the Makefile I have a small test that shows that my implementations do stuff. In deprecated_stuff
+    I have lots of unorganized stuff that may or may not prove usefull. For instance, I have several
+    test cases and ways to read it in deprecated_stuff/test and deprecated_stuff/parsing.cpp ; in particular,
+    these came from LordRap's repository https://github.com/Lordrap2002/opinion-model-maude/blob/main/generador.py
+I also have other codes in deprecated_stuff that you may find useful??????? 
+
+The actual stuff I wanted to show you are in gen.cpp, that makes all the random generation. There are
+    lots of small easter-eggs laying around, as me using FenwickTree to manage probability distributions
+    and stuff like a directed-louvain implementation.
+    
+Feel free to contact me under any doubt.
+
+osvarp
