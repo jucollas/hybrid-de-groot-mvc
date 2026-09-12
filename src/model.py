@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
-
+import math
 
 EPS = 1e-4
 
@@ -181,7 +181,7 @@ class HybridModel:
     def set_tao(self, tao) -> None:
         self._tao = tao
 
-    def get_tao() -> float:
+    def get_tao(self) -> float:
         return self._tao
 
     def add_node(self, id_node: int, opinion: float) -> None:
@@ -340,7 +340,15 @@ class HybridModel:
             next_opinions[v] += influence * (opinions[u] - opinions[v])
 
         return [min(1.0, max(0.0, value)) for value in next_opinions]
-
+    @staticmethod
+    def _find_min_edge(
+        edges_indexed:list[tuple[int,int,float]]
+    )->tuple[int,int,float]:
+        res=None
+        for edge in edges_indexed:
+            if(res==None or res[2]>edge[2]):
+                res=edge
+        return res
     @staticmethod
     def _find_node_with_tao_opinion(
             op : list[float],
@@ -349,10 +357,9 @@ class HybridModel:
         ans, u = None, 0
         low = max(tao - EPS, 0.0)
         high = min(tao + EPS, 1.0)
-        while u < len(op) and ans == None:
-            if low <= op[u] <= high:
+        for u in range(len(op)):
+            if low <= op[u] <= high and (ans==None or abs(tao-op[u])<abs(tao-op[ans]) ):
                 ans = u
-            u += 1
         return ans
 
     def _all_nodes_in_consensus(self, opinions, tao):
@@ -381,12 +388,13 @@ class HybridModel:
             self,
             path : list[tuple[int, int, float]],
             opinions : list[float],
+            LAMBDA:float=EPS,
         ):
         ans = []
         start, _, _ = path[0]
         _, term, _ = path[-1]
-        low = max(opinions[start] - EPS, 0.0)
-        high = min(opinions[start] + EPS, 1.0)
+        low  = max(opinions[start] - LAMBDA, 0.0)
+        high = min(opinions[start] + LAMBDA, 1.0)
         path_simple = [ (u, v) for u, v, _ in path ]
         print(" SI entre a copiar")
         op = opinions.copy()
@@ -413,17 +421,22 @@ class HybridModel:
             alpha_edge : tuple[int, int, float],
             opinions : list[float],
             path : list[tuple[int, int, float]],
-            tao : float
+            tao : float,
+            LAMBDA:float,
+            timeout:int=100,
         ):
         ans = []
         u, v, influence_u_to_v = alpha_edge
         w, _, influence_w_to_u = path[-1]
-        low = max(tao - EPS, 0.0)
-        high = min(tao + EPS, 1.0)
+        low  = max(tao - LAMBDA, 0.0)
+        high = min(tao + LAMBDA, 1.0)
         side_u = opinions[u] > tao
         side_v = opinions[v] > tao
+        c=max(1-influence_u_to_v,1-influence_w_to_u,abs(1-influence_u_to_v-influence_w_to_u))
+        LAMBDA_path=(LAMBDA/math.log(LAMBDA/2,c))/2
+        assert(0<LAMBDA_path<=LAMBDA)
         i = 0
-        while not(low < opinions[u] < high and low < opinions[v] < high) and i < 20:
+        while not(low < opinions[u] < high and low < opinions[v] < high) and i < timeout:
             print(opinions[u])
             print(opinions[v])
             print("Lado de u", side_u)
@@ -448,7 +461,7 @@ class HybridModel:
                     opinions[u] += influence_w_to_u * (temp - opinions[u])
                     ans.append([(u, v), (v, u)])
                 else:
-                    steps_copy_path = self._copy_opinion_path(path[:-1], opinions)
+                    steps_copy_path = self._copy_opinion_path(path[:-1], opinions,LAMBDA_path)
                     ans.extend(steps_copy_path)
                     opinions[v] += influence_u_to_v * (opinions[u] - opinions[v])
                     ans.append([(u, v)])
@@ -462,7 +475,7 @@ class HybridModel:
             elif not swap_u:
                 print("Activo v -> u")
                 if len(path) > 1:
-                    steps_copy_path = self._copy_opinion_path(path[:-1], opinions)
+                    steps_copy_path = self._copy_opinion_path(path[:-1], opinions,LAMBDA_path)
                     ans.extend(steps_copy_path)
                 print("sali")
                 opinions[u] += influence_w_to_u * (opinions[w] - opinions[u])
@@ -507,7 +520,7 @@ class HybridModel:
         return path
 
     @staticmethod
-    def _get_edges_no_puppent(edges_indexed):
+    def _get_edges_no_puppet(edges_indexed):
         return [(u, v, duv) for u, v, duv in edges_indexed if duv < 1.0 ]
 
 
@@ -529,12 +542,18 @@ class HybridModel:
         return ans
 
 
-    def _find_node_funcion_opinion(self, opinions, search_fun):
+    def _find_node_function_opinion(self, opinions, search_fun):
         u = 0
         ans = None
         while u < len(opinions) and ans == None:
             if search_fun(opinions[u]): ans = u
             u += 1
+        return ans
+    def _find_node_maximize_function(self,opinions,search_fun):
+        ans=None
+        for u in range(len(opinions)):
+            if(ans==None or search_fun(opinions[u])>search_fun(opinions[ans])):
+                ans=u
         return ans
 
     def _build_alpha_edge(
@@ -547,15 +566,20 @@ class HybridModel:
         u, v, _ = beta
         print(u, v)
         #search_fun = lambda x : x < tao if opinions[u] > tao else lambda x : x > tao
-        if opinions[u] > tao: search_fun = lambda x : x < tao
-        else: search_fun = lambda x : x > tao
-        omega = self._find_node_funcion_opinion(opinions, search_fun)
+        #if opinions[u] > tao: search_fun = lambda x : x < tao
+        #else: search_fun = lambda x : x > tao
+        #omega = self._find_node_function_opinion(opinions, search_fun)
+        
+        if(opinions[u]>tao):search_fun=lambda x:-x
+        else: search_fun=lambda x:x
+        omega=self._find_node_maximize_function(opinions,search_fun)
+
         print(omega,opinions[omega])
         path = self._find_path(omega, u, adj_graph, {v})
         if path == None:
             path = self._find_path(omega, v, adj_graph, {u})
         print(path)
-        steps_copy_path = self._copy_opinion_path(path, opinions)
+        steps_copy_path = self._copy_opinion_path(path, opinions, abs(opinions[omega]-tao))
         print(opinions)
         print(steps_copy_path)
         print(opinions[0])
@@ -570,9 +594,37 @@ class HybridModel:
             tao : float,
         ):
         ans = []
+        alpha=self._find_min_edge(edges_indexed)
+        if(alpha==None):return ans # no edges in the graph        
+        node_tao=None
+        if(alpha[2]==1): # puppet graph case
+            node_tao=self._find_node_with_tao_opinion(opinions,tao)
+        else:
+            assert(0<alpha[2]<1)
+            min_opinion,max_opinion=min(opinions),max(opinions)
+            if(min_opinion+EPS/2<=tao<=max_opinion-EPS/2):
+                if(min(opinions[alpha[0]],opinions[alpha[1]])>tao or max(opinions[alpha[0]],opinions[alpha[1]])<tao):
+                    steps_build_alpha_edge=self._build_alpha_edge(alpha,opinions,adj_graph,tao)
+                    ans.extend(steps_build_alpha_edge)
+                u, v, _ = alpha
+                print(alpha)
+                print(opinions[u], opinions[v])
+                path_v_to_u = self._find_path(v, u, adj_graph)
+                steps_build_node_tao = self._build_node_tao(alpha, opinions, path_v_to_u, tao,EPS/2)
+                ans.extend(steps_build_node_tao)
+                node_tao = alpha[0]
+            else:
+                node_tao=self._find_node_with_tao_opinion(opinions,tao)
+        if(node_tao!=None):
+            steps_copy_all = self._copy_opinion_all(node_tao, opinions, edges_indexed, tao)
+            ans.extend(steps_copy_all)
+
+
+                
+        """
         node_tao = self._find_node_with_tao_opinion(opinions, tao)
         if node_tao == None:
-            edges_no_puppet = self._get_edges_no_puppent(edges_indexed)
+            edges_no_puppet = self._get_edges_no_puppet(edges_indexed)
             if len(edges_no_puppet) != 0 and min(opinions) <= tao <= max(opinions):
                 alpha = self._find_edge_alpha(edges_no_puppet, opinions, tao)
                 if alpha == None:
@@ -587,10 +639,9 @@ class HybridModel:
                 steps_build_node_tao = self._build_node_tao(alpha, opinions, path_v_to_u, tao)
                 ans.extend(steps_build_node_tao)
                 node_tao = alpha[0]
-
         if node_tao != None:
             steps_copy_all = self._copy_opinion_all(node_tao, opinions, edges_indexed, tao)
-            ans.extend(steps_copy_all)
+            ans.extend(steps_copy_all)"""
         return ans
 
 if __name__ == "__main__":
