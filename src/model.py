@@ -566,6 +566,7 @@ class HybridModel:
 
     def _compute_steps_consensus_scc(
             self,
+            vertex_sub_graph: dict[int];
             opinions: list[float],
             edges_indexed: list[tuple[int, int, float]],
             adj_graph : list[list[tuple[int, float]]],
