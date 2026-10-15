@@ -78,6 +78,25 @@ std::vector<double> gen_lv_opi(int n,const std::vector<Edge<double>>&edges){
 	return opi;
 }
 /******************************************************************
+	* Edge weight generation functions
+********************************************************************/
+void gen_edges_with_minima(int n, std::vector<Edge<double>>&edges,const double minima){
+	// generates edge-weights on ranges [minima,1] such that
+	// $min_e\{w_e}\=minima$ and the sum doesnt excede 1
+	std::vector<double> norm(n,0);
+	for(int i=0;i<n;++i)norm[i]=rng_dbl();//for self-influence
+	for(Edge<double>&ac:edges)ac.w=rng_dbl();
+
+	std::vector<int> in_deg(n,0);
+	for(Edge<double>&ac:edges)in_deg[ac.v]++,norm[ac.v]+=ac.w;
+	for(Edge<double>&ac:edges)ac.w=ac.w*(1.-in_deg[ac.v]*minima)/norm[ac.v]+minima;
+	if(minima>0.)edges[gen(edges.size())].w=minima;
+}
+inline void gen_edges(int n,std::vector<Edge<double>>&edges){
+	gen_edges_with_minima(n,edges,0);
+}
+
+/******************************************************************
  * Graph generation functions
 *******************************************************************/
 std::vector<Edge<double>> gen_scg(int n,double p,int girth=3){
@@ -95,22 +114,6 @@ std::vector<Edge<double>> gen_scg(int n,double p,int girth=3){
 	std::vector<double> norm(n,0);for(Edge<double> &ac:res)norm[ac.v]+=ac.w;
 	for(Edge<double> &ac:res)ac.w/=norm[ac.v];
 	return res;
-}
-
-void gen_edges_with_minima(int n, std::vector<Edge<double>>&edges,const double minima,const double inc=10){
-	// generates edge-weights on ranges [minima,1] such that
-	// $min_e\{w_e}\=minima$ and the sum doesnt excede 1
-	std::vector<double> norm(n,0);
-	for(int i=0;i<n;++i)norm[i]=rng_dbl()*inc; //for self-influence
-	for(Edge<double>&ac:edges)ac.w=rng_dbl()*inc;
-	std::vector<int> in_deg(n,0);
-	for(Edge<double>&ac:edges)in_deg[ac.v]++,norm[ac.v]+=ac.w;
-	for(Edge<double>&ac:edges)ac.w=(1.-in_deg[ac.v]*minima)*ac.w/norm[ac.v]+minima;
-	edges[gen(edges.size())].w=minima;
-}
-
-inline void gen_edges(int n,std::vector<Edge<double>>&edges){
-	gen_edges_with_minima(n,edges,0);
 }
 
 /*
