@@ -1,5 +1,5 @@
 run:
-	./exec.out 100 1000 100 set_test_00
+	./exec.out 100 1000 100 set_test_01
 compile:
 	g++ -O2 generate_set_of_test.cpp -o exec.out
 clean:

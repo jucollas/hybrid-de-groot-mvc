@@ -23,6 +23,8 @@ std::vector<Edge<tedge>> remove_duplicate(const std::vector<Edge<tedge>>& edges)
 		if(e.u != e.v && !is_exist.count(p)){
 			ans.push_back(e);
 			is_exist.insert(p);
+		}else{
+			std::cout << e.u << " _ " << e.v << std::endl;
 		}
 	}
 	return ans;

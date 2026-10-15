@@ -97,11 +97,31 @@ std::vector<Edge<double>> gen_scg(int n,double p,int girth=3){
 	return res;
 }
 
+void gen_edges_with_minima(int n, std::vector<Edge<double>>&edges,const double minima,const double inc=10){
+	// generates edge-weights on ranges [minima,1] such that
+	// $min_e\{w_e}\=minima$ and the sum doesnt excede 1
+	std::vector<double> norm(n,0);
+	for(int i=0;i<n;++i)norm[i]=rng_dbl()*inc; //for self-influence
+	for(Edge<double>&ac:edges)ac.w=rng_dbl()*inc;
+	std::vector<int> in_deg(n,0);
+	for(Edge<double>&ac:edges)in_deg[ac.v]++,norm[ac.v]+=ac.w;
+	for(Edge<double>&ac:edges)ac.w=(1.-in_deg[ac.v]*minima)*ac.w/norm[ac.v]+minima;
+	edges[gen(edges.size())].w=minima;
+}
+
+inline void gen_edges(int n,std::vector<Edge<double>>&edges){
+	gen_edges_with_minima(n,edges,0);
+}
+
+/*
+function : gen_barabasiAlbert_scg
+version: 2.0
+*/
 std::vector<Edge<double>> gen_barabasiAlbert_scg(
 	const int n,const int ein,const int eout, const int girth=3){
 	// n -> graph size ; ein -> expected in-degree ; eout -> expected out-degree ; girth -> beginning cycle
 	assert(n>=girth); std::vector<Edge<double>> res;
-	for(int i=0;i<n;++i)res.emplace_back(i,i,rng_dbl());
+	//for(int i=0;i<n;++i)res.emplace_back(i,i,rng_dbl());
 	for(int i=0;i<girth;++i)res.emplace_back(i?i-1:girth-1,i,rng_dbl());
 	
 	std::vector<int> deg(n,0);
@@ -136,11 +156,12 @@ std::vector<Edge<double>> gen_barabasiAlbert_scg(
 	for(int i=0;i<girth;++i)++f_tot,update(i+1,1),++deg[i];
 	for(int i=girth;i<n;++i){
 		const int prv=res.size();
+		//std::cerr << "iteration regarding node " << i << std::endl;
 		//std::cerr<<"[deg]";for(int i=0;i<n;++i)std::cerr << ' ' << deg[i];std::cerr << std::endl;
 		//std::cerr<<"[fenw]";for(int i=0;i<=n;++i)std::cerr << ' ' << query(i);std::cerr << std::endl;
 		for(int j=0;j<=ein&&f_tot>0;++j){
 			int nd=binlift(gen(f_tot)+1); assert(nd<n);
-			//std::cerr << nd << " ???? " << i << std::endl;
+			//std::cerr << "1_insert "<< nd << ", " << i << std::endl;
 			res.emplace_back(nd,i,rng_dbl());
 
 			//std::cerr<<"[fenw]";for(int i=0;i<=n;++i)std::cerr << ' ' << query(i);std::cerr << std::endl;
@@ -164,12 +185,13 @@ std::vector<Edge<double>> gen_barabasiAlbert_scg(
 			//std::cerr<<"[deg]";for(int i=0;i<n;++i)std::cerr << ' ' << deg[i];std::cerr << std::endl;
 			
 			//std::cerr << nd << " ??_? " << i << " aa " << deg[nd] << " _ " << f_tot << " * " << query(n) << std::endl;
+			//std::cerr << "2_insert "<< i << ", " << nd << std::endl;
 			res.emplace_back(i,nd,rng_dbl());
 			
-			f_tot-=deg[nd];update(nd+1,-deg[nd]);
+			f_tot-=deg[nd];update(nd+1,-deg[nd]); ++deg[i];
 
 			
-		} f_tot+=res.size()-prv2,update(i+1,res.size()-prv2);
+		} f_tot+=deg[i],update(i+1,deg[i]);
 		for(int j=prv2;j<int(res.size());++j){
 			int v=res[j].v;
 			f_tot+=deg[v],update(v+1,deg[v]);
