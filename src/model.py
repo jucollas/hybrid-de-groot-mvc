@@ -66,7 +66,7 @@ class Graph:
         if v not in self._id_to_index:
             raise ValueError(f"Target node {v} does not exist")
         if not (influence > 0.0):
-            raise ValueError("Influence must be positive")
+            raise ValueError(f"Influence must be positive {u} -> {v} |  w : {influence}")
 
         source = self._id_to_index[u]
         target = self._id_to_index[v]

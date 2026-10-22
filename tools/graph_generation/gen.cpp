@@ -77,6 +77,10 @@ std::vector<double> gen_lv_opi(int n,const std::vector<Edge<double>>&edges){
 	};dfs(rt,0,1);delete(rt);
 	return opi;
 }
+
+void gen_edge_same_weight(int n, std::vector<Edge<double>>&edges, const double minima){
+	for(Edge<double> & ac : edges) ac.w = minima;
+}
 /******************************************************************
 	* Edge weight generation functions
 ********************************************************************/
