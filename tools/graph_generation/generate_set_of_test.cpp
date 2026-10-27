@@ -15,7 +15,7 @@ namespace fs = std::filesystem;
 
 const int PREC = 8;
 const int mod = 1e9;
-const int EIN = 2, EOUT = 1, GIRTH = 3;
+const int EIN = 2, EOUT = 2, GIRTH = 3;
 const int K = 1;
 const double MIN_EDGE = 0.001;
 const std::string dir = "../../data/generated-graphs/";
