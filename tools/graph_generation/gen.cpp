@@ -121,15 +121,74 @@ std::vector<Edge<double>> gen_scg(int n,double p,int girth=3){
 }
 
 /*
+function: circle_scg
+version : 1.0
+*/
+std::vector<Edge<double>> circle_scg(const int n){
+	std::vector<Edge<double>> res(n);// a circle
+	for(int i=0;i<n;++i)res[i].u=i;
+	for(int i=0;i<n;++i)res[i].v=i+1>=n?i+1-n:i+1;
+	return res;
+}
+/*
+function: directed_scalefree_scg
+version : 3.0
+*/
+std::vector<Edge<double>> directed_scalefree_scg(
+	const int n,const int ein,const int eout,const int girth=3){
+	// n -> graph size ; ein -> expected in-degree ; eout -> expected out-degree ; girth -> beginning cycle
+	// it can be thought of a refinement of gen_barabasiAlbert_scg
+	// more similar to things in the literature as "Directed Scale-Free Graphs" Bollobás,Borgs,Chayes,Riordan.
+	std::vector<int> din(n  ,0),dout(n  ,0);
+	std::vector<int> fin(n+1,0),fout(n+1,0);
+	int tin=0,tout=0; // fenwick-tree is 1-indexed
+	auto update=[&](std::vector<int>&bit,int x,int vl)->void{ 
+		assert(x>0); for(;x<=n;x+=x&-x)bit[x]+=vl;// $A_x=A_x+vl$
+	};auto query=[&](const std::vector<int>&bit,int x)->int{
+		assert(x>=0); // $\sum_{i=1}^xA_i$ where $A$ is the array
+		int rq=0;for(;x;x-=x&-x)rq+=bit[x];// bit represents
+		return rq;
+	}; auto binlift=[&](const std::vector<int>&bit,int obj)->int{
+		const int iobj=obj;
+		int ind=0,nx,e=1;while(e*2<=n)e<<=1;// output ind such 
+		for(;e;e>>=1){ nx=ind+e;// that query(bit,ind)<obj and
+			if(nx<n&&bit[nx]<obj)// query(bit,ind+1)>=obj
+				obj-=bit[ind=nx];
+		} return ind;
+	}; assert(n>=girth);
+	std::vector<Edge<double>> res=circle_scg(girth);
+	for(int i=0;i<girth;++i)update(fin ,i+1,din [i]=1);
+	for(int i=0;i<girth;++i)update(fout,i+1,dout[i]=1);
+	tin=tout=girth; for(int i=girth;i<n;++i){
+		for(int j=0;j<ein&&tout>0;++j){
+			const int nd=binlift(fout,gen(tout)+1);assert(nd<i);
+			// add edge $(nd,i)\in E$
+			res.emplace_back(nd,i,0); ++din[i];
+			tout-=dout[nd];update(fout,nd+1,-dout[nd]);++dout[nd];
+		} for(int j=int(res.size())-1;j>=0&&res[j].v==i;--j){
+			const int nd=res[j].u;// u->v
+			tout+=dout[nd];update(fout,nd+1,+dout[nd]);
+		} for(int j=0;j<eout&&tin >0;++j){
+			const int nd=binlift( fin,gen( tin)+1);assert(nd<i);
+			// add edge $(i,nd)\in E$
+			res.emplace_back(i,nd,0);++dout[i];
+			tin -= din[nd];update( fin,nd+1,- din[nd]); ++din[nd];
+		}for(int j=int(res.size())-1;j>=0&&res[j].u==i;--j){
+			const int nd=res[j].v;// u->v
+			tin += din[nd];update( fin,nd+1,+ din[nd]);
+		}update( fin,i+1, din[i]);tin += din[i];
+		 update(fout,i+1,dout[i]);tout+=dout[i];
+	} return res;
+}
+
+/*
 function : gen_barabasiAlbert_scg
 version: 2.0
 */
 std::vector<Edge<double>> gen_barabasiAlbert_scg(
 	const int n,const int ein,const int eout, const int girth=3){
 	// n -> graph size ; ein -> expected in-degree ; eout -> expected out-degree ; girth -> beginning cycle
-	assert(n>=girth); std::vector<Edge<double>> res;
-	//for(int i=0;i<n;++i)res.emplace_back(i,i,rng_dbl());
-	for(int i=0;i<girth;++i)res.emplace_back(i?i-1:girth-1,i,rng_dbl());
+	assert(n>=girth); std::vector<Edge<double>> res=circle_scg(girth);
 	
 	std::vector<int> deg(n,0);
 
@@ -166,7 +225,7 @@ std::vector<Edge<double>> gen_barabasiAlbert_scg(
 		//std::cerr << "iteration regarding node " << i << std::endl;
 		//std::cerr<<"[deg]";for(int i=0;i<n;++i)std::cerr << ' ' << deg[i];std::cerr << std::endl;
 		//std::cerr<<"[fenw]";for(int i=0;i<=n;++i)std::cerr << ' ' << query(i);std::cerr << std::endl;
-		for(int j=0;j<=ein&&f_tot>0;++j){
+		for(int j=0;j<ein&&f_tot>0;++j){
 			int nd=binlift(gen(f_tot)+1); assert(nd<n);
 			//std::cerr << "1_insert "<< nd << ", " << i << std::endl;
 			res.emplace_back(nd,i,rng_dbl());
@@ -185,7 +244,7 @@ std::vector<Edge<double>> gen_barabasiAlbert_scg(
 		//exit(12);
 		//std::cerr << "################## " << i << std::endl;
 		const int prv2=res.size();
-		for(int j=0;j<=eout&&f_tot>0;++j){
+		for(int j=0;j<eout&&f_tot>0;++j){
 			int nd=binlift(gen(f_tot)+1);assert(nd<n);
 			
 			//std::cerr<<"[fenw]";for(int i=0;i<=n;++i)std::cerr << ' ' << query(i);std::cerr << std::endl;
