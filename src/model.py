@@ -46,11 +46,11 @@ class HybridModel:
         tao = random.uniform(min_op, max_op)
         self.set_tao(tao)
 
-    def find_consensus_steps(self) -> None:
+    def find_consensus_steps(self, eps : float) -> None:
         opinions = self._graph.get_opinions()
         edges_indexed = self._graph.get_edges_indexed()
         adj_graph = self._graph.get_adj()
-        return self._engine._compute_steps_consensus_python(opinions, edges_indexed, adj_graph,  self._tao)
+        return self._engine._compute_steps_consensus_python(opinions, edges_indexed, adj_graph,  self._tao, eps)
 
 
     def snapshot(self) -> dict:

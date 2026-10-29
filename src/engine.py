@@ -1,9 +1,21 @@
 import math
 
+from collections import deque
+
+
 class Engine:
     
-    def __init__(self, eps : float = 1e-4):
-        self._eps = eps;
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def _get_low_and_high(
+        target : float, 
+        eps : float,
+    ) -> tuple[float, float]:
+        low = max(target - eps, 0.0)
+        high = min(target + eps, 1.0)
+        return low, high 
     
     @staticmethod
     def _find_min_edge(
@@ -16,33 +28,36 @@ class Engine:
         return ans
     
     @staticmethod
-    def _find_node_closest_tao_opinion(
-            opinion : list[float],
-            tao : float
-        ) -> int:
-        ans, u = None, 0
+    def _find_node_tao_opinion(
+        self, 
+        opinion : list[float],
+        tao : float,
+        eps : float
+    ) -> int:
+        ans = None
+        low, high = self._get_low_and_high(tao, eps)
         for u in range(len(opinion)):
-            if ans is None or abs(tao - opinion[u]) < abs(tao - opinion[ans]):
+            if ans is None and low <= opinion[u] <= high:
                 ans = u
         return ans
 
+    @staticmethod
     def _remove_nodes_in_consensus(
-            self,
-            nodes : set[int],
-            opinion : set[float],
-            low : float,
-            high : float    
-        ) -> set[int]:  
-        return {
-            u for u in nodes
-            if not low <= opinion[u] <= high
-        }
+        edges : list[tuple[int, int, float]],
+        opinion : set[float],
+        low : float,
+        high : float    
+    ) -> set[int]:  
+        return [
+            (u, v, influence) for u, v, influence in edges
+            if not low <= opinion[v] <= high
+        ]
 
+    @staticmethod
     def _compute_new_opinion(
-            self,
-            opinions : list[float],
-            enabled_indexed : list[tuple[int, int, float]]    
-        ) -> None:
+        opinions : list[float],
+        enabled_indexed : list[tuple[int, int, float]]    
+    ) -> None:
         delta : dict[int, float] = {}        
         for u, v, influence in enabled_indexed:
             delta[v] = (
@@ -53,80 +68,70 @@ class Engine:
             opinions[v] += change
 
     def _copy_opinion_set_nodes(
-            self,
-            nodes : set[int],
-            edges : list[tuple[int, int, float]],
-            opinion : list[float],
-            tao : float              
-        ) -> list[list[tuple[int, int]]]: 
+        self,
+        edges : list[tuple[int, int, float]],
+        opinion : list[float],
+        tao : float,
+        eps : float              
+    ) -> list[list[tuple[int, int]]]: 
         ans = []
-        low = max(tao - self._eps, 0.0)
-        high = min(tao + self._eps, 1.0)
-        nodes = self._remove_nodes_in_consensus(nodes, opinion, low, high)
-        edges = [   
-            (u, v, infl) 
-            for u, v, infl in edges 
-            if v in nodes
-        ]
-        while len(nodes) > 0:
+        low, high = self._get_low_and_high(tao, eps)
+        edges = self._remove_nodes_in_consensus(edges, opinion, low, high)
+        while len(edges) > 0:
             ans.append(edges)
             self._compute_new_opinion(opinion, edges)
-            nodes = self._remove_nodes_in_consensus(nodes, opinion, low, high)
-            edges = [   
-                (u, v, infl) 
-                for u, v, infl in edges 
-                if v in nodes
-            ]
+            edges = self._remove_nodes_in_consensus(edges, opinion, low, high)
         return ans 
-                
-    def _copy_opinion_all(
-            self,
-            source_node : int ,
-            opinions : list[float],
-            adj_graph : list[list[tuple[int, float]]],
-            tao : float,
-        ) -> list[list[tuple[int, int]]]:
-        from collections import deque
-        visited = [ False for _ in range(len(adj_graph))]
-        visited[source_node] = True
+
+    @staticmethod
+    def _get_bfs_levels(
+        s : int,
+        G : list[list[tuple[int, float]]]        
+    ) -> list[list[tuple[int, int, float]]]:
+        visited = [ False ] * len(G)
+        visited[s] = True
         q = deque()
-        q.append((source_node, 0))
-        cur_nodes, cur_edges = set(), list()
-        ans = []
-        cur_dist = 0
+        q.append((s, 0, None))
+        ans = [[]]
         while len(q) > 0:
-            u, du = q.popleft()
-            if du > cur_dist:
-                cur_dist = du
-                steps = self._copy_opinion_set_nodes(cur_nodes, cur_edges, opinions, tao) 
-                ans.extend(steps)
-                cur_nodes, cur_edges = set(), list()
-                
-            for v, influence in adj_graph[u]:
+            u, du, edge = q.popleft()
+            if len(ans) - 1 < du: ans.append([])
+            ans[du].append(edge)
+            for v, influence in G[u]:
                 if not visited[v]:
                     visited[v] = True
-                    q.append((v, du + 1))
-                    cur_edges.append((u, v, influence))
-                    cur_nodes.add(v)
-
-        if len(cur_nodes) > 0:
-            steps = self._copy_opinion_set_nodes(cur_nodes, cur_edges, opinions, tao)
-            ans.extend(steps)
-            cur_nodes, cur_edges = set(), list()
-
+                    q.append((v, du + 1, (u, v, influence)))
+        return ans
+        
+                
+    def _copy_opinion_all(
+        self,
+        source_node : int ,
+        opinions : list[float],
+        adj_graph : list[list[tuple[int, float]]],
+        tao : float,
+        eps : float
+    ) -> list[list[tuple[int, int]]]:
+        ans = []        
+        levels = self._get_bfs_levels(source_node, adj_graph)
+        print("levels", levels[:3])
+        gama = eps / len(levels)
+        for i in range(1, len(levels)):
+            steps = self._copy_opinion_set_nodes(levels[i], opinions, tao, eps)
+            print(opinions[:10])
+            ans.append(steps)
         return ans
 
     def _copy_opinion_path(
-            self,
-            path : list[tuple[int, int, float]],
-            opinions : list[float],
-            LAMBDA : float,
-        ):
+        self,
+        path : list[tuple[int, int, float]],
+        opinions : list[float],
+        eps : float,
+    ) -> list[list[tuple[int, int, float]]]:
         ans = []
         start, _, _ = path[0]
         _, term, _ = path[-1]
-        low  = max(opinions[start] - LAMBDA, 0.0)
-        high = min(opinions[start] + LAMBDA, 1.0)
+        low, high = self._get_low_and_high(opinions[start], eps)
         path_simple = [ (u, v) for u, v, _ in path ]
         while not (low <= opinions[term] <= high):
             self._compute_new_opinion(opinions, path)
@@ -134,30 +139,28 @@ class Engine:
         return ans
 
     def _build_node_tao(
-            self,
-            alpha_edge : tuple[int, int, float],
-            opinions : list[float],
-            path : list[tuple[int, int, float]],
-            tao : float,
-            LAMBDA: float,
-            timeout: int=100,
-        ):
+        self,
+        alpha_edge : tuple[int, int, float],
+        opinions : list[float],
+        path : list[tuple[int, int, float]],
+        tao : float,
+        eps : float,
+        timeout: int = 100,
+    ) -> list[list[tuple[int, int, float]]]:
         ans = []
         u, v, influence_u_to_v = alpha_edge
         w, _, influence_w_to_u = path[-1]
-        low  = max(tao - LAMBDA, 0.0)
-        high = min(tao + LAMBDA, 1.0)
+        low, high = self._get_low_and_high(tao, eps)
         side_u = opinions[u] > tao
         side_v = opinions[v] > tao
         c = max(1 - influence_u_to_v, 1 - influence_w_to_u, abs( 1 - influence_u_to_v - influence_w_to_u))
-        LAMBDA_path = (LAMBDA / math.log(LAMBDA / 2, c)) / 2
-        assert(0<LAMBDA_path<=LAMBDA)
+        lambda_path = (eps / math.log(eps / 2, c)) / 2
+        assert(0 < lambda_path <= eps)
 
         i = 0
-        while not(low < opinions[u] < high and low < opinions[v] < high) and i < timeout:
+        while not (low < opinions[u] < high and low < opinions[v] < high) and i < timeout:
             swap_v = ((opinions[v] + (influence_u_to_v * (opinions[u] - opinions[v]))) > tao) ^ side_v
             swap_u = ((opinions[u] + (influence_w_to_u * (opinions[v] - opinions[u]))) > tao) ^ side_u
-
             if not (swap_u ^ swap_v):
                 if len(path) == 1:
                     temp = opinions[v]
@@ -165,7 +168,7 @@ class Engine:
                     opinions[u] += influence_w_to_u * (temp - opinions[u])
                     ans.append([(u, v), (v, u)])
                 else:
-                    steps_copy_path = self._copy_opinion_path(path[:-1], opinions,LAMBDA_path)
+                    steps_copy_path = self._copy_opinion_path(path[:-1], opinions, lambda_path)
                     ans.extend(steps_copy_path)
                     opinions[v] += influence_u_to_v * (opinions[u] - opinions[v])
                     ans.append([(u, v)])
@@ -176,21 +179,23 @@ class Engine:
                 ans.append([(u, v)])
             elif not swap_u:
                 if len(path) > 1:
-                    steps_copy_path = self._copy_opinion_path(path[:-1], opinions,LAMBDA_path)
+                    steps_copy_path = self._copy_opinion_path(path[:-1], opinions, lambda_path)
                     ans.extend(steps_copy_path)
                 opinions[u] += influence_w_to_u * (opinions[w] - opinions[u])
                 ans.append([(w, u)])
-
             side_u = opinions[u] > tao
             side_v = opinions[v] > tao
             i += 0
-
         return ans
 
 
     @staticmethod
-    def _find_path(start, term, G, restrict : set = {}):
-        from collections import deque
+    def _find_path(
+        start : int, 
+        term : int, 
+        G : list[list[tuple[int, float]]], 
+        restrict : set[int] = set()
+    ) -> list[tuple[int, int, float]]:
         n = len(G)
         parent = [ None for _ in range(n)]
         visted = [ False for _ in range(n)]
@@ -215,10 +220,13 @@ class Engine:
             path.append((p, u, dist))
             u = p
         path.reverse()
-
         return path
 
-    def _find_node_maximize_function(self, opinions, search_fun):
+    def _find_node_maximize_function(
+        self, 
+        opinions : list[float], 
+        search_fun : function[float, float]
+    ) -> int:
         ans = 0
         for u in range(len(opinions)):
             if search_fun(opinions[u]) > search_fun(opinions[ans]):
@@ -226,18 +234,18 @@ class Engine:
         return ans
 
     def _build_alpha_edge(
-            self,
-            beta : tuple[int, int, float],
-            opinions : list[float],
-            adj_graph : list[list[tuple[int, float]]],
-            tao : float,
-        ):
+        self,
+        beta : tuple[int, int, float],
+        opinions : list[float],
+        adj_graph : list[list[tuple[int, float]]],
+        tao : float,
+        eps : float
+    ) -> list[list[tuple[int, int, float]]] :
         u, v, _ = beta
-        
+
+        search_fun = lambda x:x
         if opinions[u] > tao: 
             search_fun = lambda x:-x
-        else: 
-            search_fun = lambda x:x
             
         omega = self._find_node_maximize_function(opinions, search_fun)
         path = self._find_path(omega, u, adj_graph, {v})
@@ -246,54 +254,56 @@ class Engine:
         steps_copy_path = self._copy_opinion_path(path, opinions, abs(opinions[omega] - tao))
         return steps_copy_path
 
-    def check_all(
-            self, 
-            tao : float, 
-            opinions : list[float]
-        ) -> None:
-        low  = max(tao - self._eps, 0.0)
-        high = min(tao + self._eps, 1.0)
-        
+    def _check_all(
+        self, 
+        opinions : list[float],
+        tao : float, 
+        eps : float, 
+    ) -> None:
+        low, high = self._get_low_and_high(tao, eps)
         for u in range(len(opinions)):
             if not low <= opinions[u] <= high:
                 raise ValueError(f"{low} <= {opinions[u]} < {high} [{u}] : Not check")
 
     def _compute_steps_consensus_python(
-            self,
-            opinions: list[float],
-            edges_indexed: list[tuple[int, int, float]],
-            adj_graph : list[list[tuple[int, float]]],
-            tao : float,
-        ) -> list[list[tuple[int, int, float]]]:
-        ans = []
-        eps_half = self._eps / 2
-
-        alpha = self._find_min_edge(edges_indexed)
-        if alpha == None: 
-            return ans
-        
-        influence = alpha[2]
-        node_tao = self._find_node_closest_tao_opinion(opinions,tao)
-
-        if influence < 1.0:
-            min_opinion, max_opinion = min(opinions), max(opinions)
-            low =  min_opinion + eps_half
-            high = max_opinion - eps_half
+        self,
+        opinions: list[float],
+        edges_indexed: list[tuple[int, int, float]],
+        adj_graph : list[list[tuple[int, float]]],
+        tao : float,
+        eps : float
+    ) -> list[list[tuple[int, int, float]]]:
+        ans = None
+        node_tao = None
+        steps_to_consensus = []
+        eps_half = eps / 2
+        omega = self._find_min_edge(edges_indexed)
+        influence = omega[2]
+        if influence >= 1.0:
+            node_tao = self._find_node_tao_opinion(opinions, tao, eps)
+        else:
+            alpha = omega
+            low =  max(min(opinions) - eps_half, 0.0)
+            high = min(max(opinions) + eps_half, 1.0)
             if low <= tao <= high:
                 u, v, _ = alpha
-                if min(opinions[u], opinions[v]) > tao or max(opinions[u], opinions[v]) < tao:
-                    steps_build_alpha_edge = self._build_alpha_edge(alpha, opinions, adj_graph, tao)
-                    ans.extend(steps_build_alpha_edge)
+                alpha_max = max(opinions[u], opinions[v])
+                alpha_min = min(opinions[u], opinions[v])
+                if alpha_min > tao or alpha_max < tao:
+                    steps_build_alpha_edge = self._build_alpha_edge(alpha, opinions, adj_graph, tao, eps)
+                    steps_to_consensus.extend(steps_build_alpha_edge)
+
                 path_v_to_u = self._find_path(v, u, adj_graph)
                 steps_build_node_tao = self._build_node_tao(alpha, opinions, path_v_to_u, tao, eps_half)
-                ans.extend(steps_build_node_tao)
+                steps_to_consensus.extend(steps_build_node_tao)
                 node_tao = alpha[0]
 
-        steps_copy_all = self._copy_opinion_all(node_tao, opinions, adj_graph, tao)
-        ans.extend(steps_copy_all)
-
-        self.check_all(tao, opinions)
-        
+        if not node_tao is None:
+            print("tao", node_tao)
+            steps_copy_all = self._copy_opinion_all(node_tao, opinions, adj_graph, tao, eps)
+            steps_to_consensus.extend(steps_copy_all)
+            ans = steps_to_consensus
+            self._check_all(opinions, tao, eps)
         return ans
 
         """@staticmethod
