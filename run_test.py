@@ -12,7 +12,7 @@ PATH_DATA = Path("./data/generated-graphs/")
 PATH_REPORTS = Path("./reports")
 PATH_ERROR_REPORTS = Path("./error_reports")
 PATH_LOG = Path("./log")
-EPS = 1e-3
+EPS = 1e-4
 
 seed = 9999
 

@@ -114,11 +114,11 @@ class Engine:
     ) -> list[list[tuple[int, int]]]:
         ans = []        
         levels = self._get_bfs_levels(source_node, adj_graph)
-        print("levels", levels[:3])
+        #print("levels", levels[:3])
         gama = eps / len(levels)
         for i in range(1, len(levels)):
-            steps = self._copy_opinion_set_nodes(levels[i], opinions, tao, eps)
-            print(opinions[:10])
+            steps = self._copy_opinion_set_nodes(levels[i], opinions, tao, gama)
+            #print(opinions[:10])
             ans.append(steps)
         return ans
 
@@ -299,7 +299,7 @@ class Engine:
                 node_tao = alpha[0]
 
         if not node_tao is None:
-            print("tao", node_tao)
+            #print("tao", node_tao)
             steps_copy_all = self._copy_opinion_all(node_tao, opinions, adj_graph, tao, eps)
             steps_to_consensus.extend(steps_copy_all)
             ans = steps_to_consensus
