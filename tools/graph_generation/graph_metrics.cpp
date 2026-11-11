@@ -52,7 +52,8 @@ template<typename tedge>
 std::pair<int,int> graph_metrics(const int n,const std::vector<Edge<tedge>> &edges){
 	// retrieves both the diameter and the radius of the graph.
 	int diam=-1,rad=n*333;
-	auto dist=(n*1ll*n<=edges.size()+rad)?floyd_warshall(n,edges):all_pairs_sparse(n,edges);
+	// BFS from every node, O(n(n+m)), is never asymptotically worse than Floyd-Warshall O(n^3)
+	auto dist=all_pairs_sparse(n,edges);
 	/*for(int i=0;i<n;++i)for(int j=0;j<n;++j){
 		if(dist[i][j]==5)std::cerr << i << " <-> " << j << std::endl;
 	}*/
@@ -67,30 +68,25 @@ std::pair<int,int> graph_metrics(const int n,const std::vector<Edge<tedge>> &edg
 template<typename tedge>
 bool strongly_connected( const int n,const std::vector<Edge<tedge>> &edges){
 	if(n<=0)return 1; // verifies in O(n+m) if the graph is strongly connected.
-	std::vector<std::vector<int>> g(n);
-	for(const Edge<tedge> &e:edges)g[e.u].push_back(e.v);
-
-	std::vector<int> topo;topo.reserve(n);
-	std::vector<bool> us(n,0);
-	std::function<void(int)> taux=[&](int nd)->void{
-		us[nd]=1;for(int e:g[nd])if(!us[e])taux(e);
-		topo.push_back(nd);
-	};for(int i=0;i<n;++i)if(!us[i])taux(i);
-	//std::cout << "dxdxdxd" << std::endl;
-	for(int i=0;i<n;++i)us[i]=0;
-	std::function<int(int)>c_ch=[&](int nd)->int{
-		int res=1;us[nd]=1;
-		for(int e:g[nd])if(!us[e])res+=c_ch(e);
-		return res;
-	};const int cmp=c_ch(topo.front());
-
-	//std::cout << cmp << " ????? " << n << std::endl;
-	return cmp==n;
+	// The graph is strongly connected iff node 0 reaches every node in G
+	// and every node reaches node 0 (i.e. node 0 reaches every node in G^T).
+	std::vector<std::vector<int>> g(n),gt(n);
+	for(const Edge<tedge> &e:edges)g[e.u].push_back(e.v),gt[e.v].push_back(e.u);
+	auto reaches_all=[&](const std::vector<std::vector<int>>&adj)->bool{
+		std::vector<bool> us(n,0);std::vector<int> st={0};us[0]=1;int cnt=1;
+		while(!st.empty()){ // iterative DFS, avoids stack overflow for large n
+			const int nd=st.back();st.pop_back();
+			for(int e:adj[nd])if(!us[e])us[e]=1,++cnt,st.push_back(e);
+		} return cnt==n;
+	};
+	return reaches_all(g)&&reaches_all(gt);
 }
 
 template<typename tedge>
 int efficient_diameter(const int n,const std::vector<Edge<tedge>> &edges){
 	// only works for undirected graphs _____ XD
+	// NOTE: repeated double-sweep BFS. It is exact on trees; on general graphs it only
+	// returns a LOWER BOUND of the diameter.
 	const int inf=n*333;//O(n+m)
 	std::vector<std::vector<int>> g(n);
 	for(const Edge<tedge> &e:edges)g[e.u].push_back(e.v);

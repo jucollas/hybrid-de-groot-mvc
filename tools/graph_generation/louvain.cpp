@@ -36,6 +36,12 @@ struct LTree{
 // where k_i=\sum_j A_{ij} ; c_i is the group of node i ; m is the amount of nodes
 // delta modularity
 // \frac{\sum_in+k_i}{2m}
+
+// Directed modularity:
+// 1/m \sum_{i,j}[c_i==c_j](A_{ij}-\frac{k^{out}_ik^{in}_j}{m})
+// where k^{out}_i=\sum_j A_{ij}, k^{in}_j=\sum_i A_{ij} ; c_i is the group of node i ;
+// m=\sum_{i,j}A_{ij} is the TOTAL EDGE WEIGHT (not the amount of nodes)
+
 template<typename tedge>
 LTree* di_louvain(int n,std::vector<Edge<tedge>> edge){
 	//for(auto e:edge)assert(e.w==0.); // was failing xd
@@ -53,21 +59,28 @@ LTree* di_louvain(int n,std::vector<Edge<tedge>> edge){
 			const Edge<tedge>&e=edge[i];
 			e_adj[e.u].push_back(i);
 			if(e.u!=e.v)e_adj[e.v].push_back(i);
-		} for(int i=0;i<n;++i)for(int eind:e_adj[i]){
-			k_in[edge[eind].v]+=edge[eind].w;
-			k_out[i]+=edge[eind].w;
+			// each edge counted exactly once (e_adj holds non-self edges twice)
+			k_out[e.u]+=e.w; k_in[e.v]+=e.w;
 		} for(int i=0;i<n;++i)c[i]=i;
 		s_kin.resize(n);s_kout.resize(n);
 		for(int i=0;i<n;++i)s_kin[i]=k_in[i],s_kout[i]=k_out[i];
 	}; 
 
 	
+	if(n<=0)return new LTree; // avoids hier_cl.front() on empty input
 	std::vector<LTree*> hier_cl(n);for(int i=0;i<n;++i)hier_cl[i]=new LTree(i);
+
+	// total edge weight. It is invariant through the aggregation levels.
+	tedge m=0;for(const Edge<tedge>&e:edge)m+=e.w;
+	if(!(m>tedge(0))){ // no weight -> no community structure; flat tree
+		if(n==1)return hier_cl.front();
+		LTree*res=new LTree;res->child=hier_cl;return res;
+	}
 
 	auto calc_modularity=[&]()->tedge{
 		tedge res=0; // calculates in O(n+m) the modularity
 		// Im overcounting all except self edges if I dont add the *2
-		for(int i=0;i<n;++i)res-=(k_in[i]*s_kout[c[i]] + s_kin[c[i]]*k_out[i])/tedge(2*n);
+		for(int i=0;i<n;++i)res-=(k_in[i]*s_kout[c[i]] + s_kin[c[i]]*k_out[i])/tedge(2*m);
 		for(const Edge<tedge>&e:edge)if(c[e.u]==c[e.v]){
 			res+=e.w;
 		} return res;//tedge(2*n);
@@ -98,10 +111,10 @@ LTree* di_louvain(int n,std::vector<Edge<tedge>> edge){
 					//std::cerr << e.w << " __ " << upd << '\n';
 				#endif // TEST_LOUVAIN_MODE
 			}
-			const tedge cnst=ncl[c[nd]]-(k_in[nd]*(s_kout[c[nd]]-k_out[nd])+(s_kin[c[nd]]-k_in[nd])*k_out[nd])/tedge(n);
-			//const tedge cnst=ncl[c[nd]]-(k_in[nd]*(s_kout[c[nd]]-0.)+(s_kin[c[nd]]-0.)*k_out[nd])/tedge(n);
+			const tedge cnst=ncl[c[nd]]-(k_in[nd]*(s_kout[c[nd]]-k_out[nd])+(s_kin[c[nd]]-k_in[nd])*k_out[nd])/tedge(m);
+			//const tedge cnst=ncl[c[nd]]-(k_in[nd]*(s_kout[c[nd]]-0.)+(s_kin[c[nd]]-0.)*k_out[nd])/tedge(m);
 			int b_cl=c[nd];tedge b_vl=0; for(int cl:vcl)if(cl!=c[nd]){
-				tedge a_vl=ncl[cl]-(k_in[nd]*s_kout[cl]+ s_kin[cl]*k_out[nd])/tedge(n);
+				tedge a_vl=ncl[cl]-(k_in[nd]*s_kout[cl]+ s_kin[cl]*k_out[nd])/tedge(m);
 				a_vl-=cnst; //a_vl/=tedge(2*n);
 				#ifdef TEST_LOUVAIN_MODE
 					const double EPS=1e-8;
