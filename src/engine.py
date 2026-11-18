@@ -157,6 +157,7 @@ class Engine:
         path : list[tuple[int, int, float]],
         opinions : list[float],
         eps : float,
+        timeout : int = 100000
     ) -> list[list[tuple[int, int, float]]]:
         """
         Clones the opinion through the path of edges in 'path'
@@ -166,13 +167,26 @@ class Engine:
         Notice that it only makes sure that the last node in the path
             is at most at distance $eps$.
         """
+        
         ans = []
         start, _, _ = path[0]
         _, term, _ = path[-1]
+        #print("path", path)
         low, high = self._get_low_and_high(opinions[start], eps)
-        while not (low < opinions[term] < high):
+        #print(start, opinions[start])
+        #print(term, opinions[term])
+        i = 0
+        #while not (low < opinions[term] < high) and i < timeout:
+        while abs(opinions[term] - opinions[start]) >= eps and i < timeout:
+            #print(f"{abs(opinions[term] - opinions[start])} > {eps}")
+            #print(f"{low} < {opinions[term]} < {high}")
             self._compute_new_opinion(opinions, path)
             ans.append(path)
+            i += 1
+        #print(timeout,i,eps)
+        assert( abs(opinions[term]-opinions[start]) < eps)
+        #print("len_copy_path", len(ans))
+        #0/0
         return ans
 
     def _build_node_tao(
@@ -202,11 +216,26 @@ class Engine:
         side_u = opinions[u] > tao
         side_v = opinions[v] > tao
         c = max(1 - influence_u_to_v, 1 - influence_w_to_u, abs( 1 - influence_u_to_v - influence_w_to_u))
-        lambda_path = (eps / (math.log(eps / 2, c) + 1 ) ) / 2
+        lambda_path = (eps / (math.log(eps / 2, c) + 1 ) ) /2
+        lambda_path=(eps*(1-c))/(2-eps) /2
+        lambda_path=eps*(1-influence_u_to_v)/(2-eps)
+        print(f"eps : {eps}, math.log(eps / 2, c) :{math.log(eps / 2, c)}, c**200 {c**200}, c {c}, influence_u_to_v {influence_u_to_v}")
+        print(f"lambda_path : {lambda_path}")
+        print(f"1-c {1-c}, 2-eps {2-eps}, eps {eps}, 1/(1-c) {1/(1-c)}")
+        #0/0
         assert(0 < lambda_path <= eps)
+        
+        
 
         i = 0
         while not (low < opinions[u] < high or low < opinions[v] < high) and i < timeout:
+            current_dist = abs(opinions[u] - opinions[v])
+                
+            #if opinions[u] < tao < opinions[v]: print(f"{opinions[u]} < {tao} < {opinions[v]}")
+            #if opinions[v] < tao < opinions[u]: print(f"{opinions[v]} < {tao} < {opinions[u]}")
+                            
+            assert(opinions[u] < tao < opinions[v] or opinions[v] < tao < opinions[u] )
+            
             swap_v = ((opinions[v] + (influence_u_to_v * (opinions[u] - opinions[v]))) > tao) ^ side_v
             swap_u = ((opinions[u] + (influence_w_to_u * (opinions[v] - opinions[u]))) > tao) ^ side_u
             # swap_h is 1 if h changed sides
@@ -218,6 +247,7 @@ class Engine:
                     ans.append([(u, v,influence_u_to_v), (v, u,influence_w_to_u)])
                 else:
                     steps_copy_path = self._copy_opinion_path(path[:-1], opinions, lambda_path)
+                    #print("len_copy_path", len(steps_copy_path))
                     ans.extend(steps_copy_path)
                     opinions[v] += influence_u_to_v * (opinions[u] - opinions[v])
                     ans.append([(u, v,influence_u_to_v)])
@@ -229,12 +259,17 @@ class Engine:
             elif not swap_u: # it is safe to keep v and change u
                 if len(path) > 1:
                     steps_copy_path = self._copy_opinion_path(path[:-1], opinions, lambda_path)
+                    #print("len_copy_path", len(steps_copy_path))
                     ans.extend(steps_copy_path)
                 opinions[u] += influence_w_to_u * (opinions[w] - opinions[u])
                 ans.append([(w, u,influence_w_to_u)])
             side_u = opinions[u] > tao
             side_v = opinions[v] > tao
+            
             i += 1
+            next_dist = abs(opinions[u] - opinions[v])
+            assert(current_dist >= next_dist)
+        print(f"i : {i}")
         if not (low < opinions[u] < high or low < opinions[v] < high): assert(False)
         return ans
 
@@ -349,7 +384,7 @@ class Engine:
         """
         ans = None
         node_tao = None
-        steps_to_consensus = []
+        steps_to_consensus = dict()
         eps_half = eps / 2
         omega = self._find_min_edge(edges_indexed)
         if omega is None or omega[2] >= 1.0: # puppet-graph
@@ -363,11 +398,14 @@ class Engine:
                 alpha_min = min(opinions[u], opinions[v])
                 if alpha_min > tao or alpha_max < tao:
                     steps_build_alpha_edge = self._build_alpha_edge(alpha, opinions, adj_graph, tao )
-                    steps_to_consensus.extend(steps_build_alpha_edge)
+                    steps_to_consensus["build_alpha"] = steps_build_alpha_edge
 
                 path_v_to_u = self._find_path(v, u, adj_graph)
+                print("u, v", u, v)
+                print("len path", len(path_v_to_u))
+                print("path", path_v_to_u)
                 steps_build_node_tao = self._build_node_tao(alpha, opinions, path_v_to_u, tao, eps_half)
-                steps_to_consensus.extend(steps_build_node_tao)
+                steps_to_consensus["build_tao"] = steps_build_node_tao
                 node_tao = alpha[0] if abs(opinions[alpha[0]]-tao)<=abs(opinions[alpha[1]]-tao) else alpha[1]
             else: # cloning from a single node
                 node_tao = self._find_node_tao_opinion(opinions, tao, eps)
@@ -375,7 +413,7 @@ class Engine:
             #print("tao", node_tao)
             steps_copy_all = self._copy_opinion_all(node_tao, opinions, adj_graph, 
                     min(tao+eps-opinions[node_tao],opinions[node_tao]-(tao-eps)) )
-            steps_to_consensus.extend(steps_copy_all)
+            steps_to_consensus["copy_all"] = steps_copy_all
             ans = steps_to_consensus
             self._check_all(opinions, tao, eps)
         return ans

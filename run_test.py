@@ -31,7 +31,7 @@ def main():
         "--replications",
         help="Number of times to repeat each experiment",
         type=int,
-        default=10
+        default=100
     )
 
     args = parser.parse_args()
@@ -107,7 +107,8 @@ def main():
         print("Start:", file.name)
 
         for i in range(n_replications):
-            model.generate_random_valid_tao(seed + i)
+            #model.generate_random_valid_tao(seed + i)
+            model.set_middle_tao()
             tao = model.get_tao()
             print(f"tao : {tao}")
             start_time = time.perf_counter()

@@ -19,7 +19,7 @@ int main(int argc, char* argv[]){
 	const int N = argc > 1 ? std::stoi(argv[1]) : 10;
 	const std::string name_out_file = argc > 2 ? argv[2] : "graph.txt"; 
 
-	std::vector<Edge<double>> edge = gen_barabasiAlbert_scg(N, EIN, EOUT, GIRTH);
+	std::vector<Edge<double>> edge = directed_scalefree_scg(N, EIN, EOUT, GIRTH);
 	std::vector<double> opi = gen_lv_opi(N, edge);
 
 	assert(strongly_connected(N, edge));

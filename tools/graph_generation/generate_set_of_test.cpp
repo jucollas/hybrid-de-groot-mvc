@@ -18,21 +18,22 @@ const int mod = 1e9;
 const int EIN = 2, EOUT = 2, GIRTH = 3;
 const int K = 1;
 const double MIN_EDGE = 0.001;
-const std::string dir = "../../data/generated-graphs/";
+const std::string dir = "../data/generated-graphs/";
 
 int main(int argc, char* argv[]){
 	const int N_min = argc > 1 ? std::stoi(argv[1]) : 10;
 	const int N_max = argc > 2 ? std::stoi(argv[2]) : 100;
 	const int step = argc > 3 ? std::stoi(argv[3]) : 10;
-	const std::string folder_name = argc > 4 ? std::string(argv[4]) + "/" : "set_test_00/";
+	const std::string folder_name = argc > 4 ? std::string(argv[4]) + "/" : "set_test_06/";
 
 	fs::path dir_path(dir  + folder_name);
 	if(!(fs::exists(dir_path) && fs::is_directory(dir_path))){
+		std::cout << "Create directory : " << dir  + folder_name << std::endl;
 		fs::create_directory(dir + folder_name);
 	}
 
 	for(int n = N_min; n <= N_max; n += step){
-		std::vector<Edge<double>> edge = gen_barabasiAlbert_scg(n, EIN, EOUT, GIRTH);
+		std::vector<Edge<double>> edge = directed_scalefree_scg(n, EIN, EOUT, GIRTH);
 		gen_edge_same_weight(n, edge, MIN_EDGE);
 		//cout << max_indegre
 		//std::vector<Edge<double>> clean_edge = remove_duplicate(edge);

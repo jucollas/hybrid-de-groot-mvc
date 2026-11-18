@@ -45,8 +45,16 @@ class HybridModel:
         max_op = max(opinions)
         tao = random.uniform(min_op, max_op)
         self.set_tao(tao)
+        
+    def set_middle_tao(self):
+        opinions = self._graph.get_opinions()
+        min_op = min(opinions)
+        max_op = max(opinions)
+        tao = (min_op + max_op) / 2
+        self.set_tao(tao)
+        
 
-    def find_consensus_steps(self, eps : float) -> None:
+    def find_consensus_steps(self, eps : float) -> dict:
         opinions = self._graph.get_opinions()
         edges_indexed = self._graph.get_edges_indexed()
         adj_graph = self._graph.get_adj()
