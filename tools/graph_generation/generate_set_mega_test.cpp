@@ -1,0 +1,65 @@
+#include <iostream>
+#include <iomanip>
+#include <cassert>
+#include <fstream>
+#include <filesystem>
+#include <string>
+
+#include "gen.cpp"
+#include "graph_metrics.cpp"
+#include "utils.cpp"
+
+typedef long long lint;
+
+namespace fs = std::filesystem;
+
+const int PREC = 8;
+const int mod = 1e9;
+const int EIN = 2, EOUT = 2, GIRTH = 3;
+const int K = 1;
+const double MIN_EDGE = 0.001;
+const std::string dir = "../data/generated-graphs/";
+
+int main(int argc, char* argv[]){
+	const int N_min = argc > 1 ? std::stoi(argv[1]) : 10;
+	const int N_max = argc > 2 ? std::stoi(argv[2]) : 100;
+	const int step = argc > 3 ? std::stoi(argv[3]) : 10;
+	const int rep = argc > 4 ? std::stoi(argv[4]) : 10;
+	const std::string folder_name = argc > 5 ? std::string(argv[4]) + "/" : "set_mega_test_00/";
+	std::cout << folder_name << std::endl;
+
+	fs::path dir_path(dir  + folder_name);
+	if(!(fs::exists(dir_path) && fs::is_directory(dir_path))){
+		std::cout << "Create directory : " << dir  + folder_name << std::endl;
+		fs::create_directory(dir + folder_name);
+	}
+
+	for(int n = N_min; n <= N_max; n += step){
+		std::string path_set_n = dir + folder_name + "/s_" + std::to_string(n) + "/";
+		fs::create_directory(path_set_n);
+		for(int k = 0; k < rep; ++k){
+			std::vector<Edge<double>> edge = directed_scalefree_scg(n, EIN, EOUT, GIRTH);
+			gen_edge_same_weight(n, edge, MIN_EDGE);
+			std::vector<double> opi = gen_lv_opi(n, edge);
+			assert(strongly_connected(n, edge));
+			std::ios_base::sync_with_stdio(false);
+			std::cin.tie(NULL);
+
+			std::string name_out_file = "t_" + std::to_string(n) + "_" + std::to_string(k)  + ".txt";
+
+			std::ofstream outfile(path_set_n  + name_out_file);
+			if(!outfile.is_open()){
+				std::cerr << "Error : Could not open file " << name_out_file << std::endl;
+				return 1;
+			}
+			outfile << std::setprecision(PREC) << std::fixed;
+			outfile << n << " " << (int) edge.size() << "\n";
+			for(int i = 0; i < (int) opi.size(); ++i)
+				outfile << i << " " << opi[i] << "\n";
+			for(const Edge<double>&e : edge)
+				outfile << e.u << " " << e.v << " " << e.w << "\n";
+			outfile.close();
+		}
+	}
+	return 0;
+}
