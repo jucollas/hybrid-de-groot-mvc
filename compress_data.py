@@ -13,7 +13,7 @@ def plot_dispert(df):
 
     plt.scatter(
         df["n_verte_graph"],
-        df["execution_time"],
+        df["copy_all_steps"],
         alpha=0.5,
         color="blue",
         label="Execution Time"
@@ -32,7 +32,7 @@ def plot_dispert(df):
 def plot_steps(data):
     plt.figure(figsize=(10, 6))
 
-    plt.plot(data.index, data["min"],
+    plt.plot(data.index, data["mean"],
             marker="o", color="blue", label="Steps")
 
     """plt.plot(all_stats.index, all_stats["max"],
@@ -84,7 +84,7 @@ def main():
     args = parser.parse_args()
     
     input_file = args.input_file
-    output_file = Path(input_file.stem + "_compress" + input_file.suffix)
+    """output_file = Path(input_file.stem + "_compress" + input_file.suffix)
     
     fieldnames = [
         "n_vertex",
@@ -94,13 +94,13 @@ def main():
         "min_execution_time",
         "max_execution_time",
         "steps_to_consensus"
-    ]
+    ]"""
     
     
     
-    with output_file.open("a", newline="", encoding="utf-8") as outfile:
+    """with output_file.open("a", newline="", encoding="utf-8") as outfile:
         writer = csv.DictWriter(outfile, fieldnames=fieldnames)
-        writer.writeheader()
+        writer.writeheader()"""
         
     try: 
         df = pd.read_csv(input_file)
@@ -112,13 +112,25 @@ def main():
     max_time = df.groupby("n_verte_graph")["execution_time"].max()
     min_time = df.groupby("n_verte_graph")["execution_time"].min()"""
     plot_dispert(df)
+    
     all_stats = df.groupby("n_verte_graph")["execution_time"].agg(["mean", "max", "min"])
     plot_metric(all_stats)
-    all_stats = df.groupby("n_edges_graph")["execution_time"].agg(["mean", "max", "min"])
+
+    """all_stats = df.groupby("n_edges_graph")["execution_time"].agg(["mean", "max", "min"])
     plot_metric(all_stats)
+    """
     
-    steps_to_consensus = df.groupby("n_verte_graph")["steps_to_consensus"].agg(["min"])#.agg(["mean", "max", "min"])
-    print(steps_to_consensus)
+    df["total_steps"] = (
+        df["build_alpha_steps"] +
+        df["build_tao_steps"] +
+        df["copy_all_steps"]
+    )
+
+    steps_to_consensus = (
+        df.groupby("n_verte_graph")["total_steps"]
+        .agg(["mean"])
+    )
+
     plot_steps(steps_to_consensus)
     
     

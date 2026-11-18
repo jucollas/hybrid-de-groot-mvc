@@ -4,7 +4,7 @@ import argparse
 import csv
 
 from pathlib import Path
-from copy import copy
+from functools import reduce
 
 from src.model import HybridModel
 
@@ -27,22 +27,11 @@ def main():
         default="set_test_00"
     )
 
-    parser.add_argument(
-        "--replications",
-        help="Number of times to repeat each experiment",
-        type=int,
-        default=5
-    )
-
     args = parser.parse_args()
 
     folder = args.folder_test
-    n_replications = args.replications
 
-    if n_replications <= 0:
-        parser.error("--replications must be greater than 0")
-
-    directory = PATH_DATA / folder
+    directory : Path = PATH_DATA / folder
 
     if not directory.is_dir():
         parser.error(f"Directory not found: {directory}")
@@ -56,10 +45,12 @@ def main():
     fieldnames = [
         "n_verte_graph",
         "n_edges_graph",
-        "replication",
+        "n_file",
         "tao",
         "execution_time",
-        "steps_to_consensus"
+        "build_alpha_steps",
+        "build_tao_steps",
+        "copy_all_steps"
     ]
     
     if not report_path.is_file():
@@ -81,82 +72,83 @@ def main():
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames_error)
             writer.writeheader()
 
-    
-    
     status_execute_path = PATH_LOG / f"staus_execute_{folder}_{formatted}.log"
     if not status_execute_path.is_file():
         with status_execute_path.open("w", newline="", encoding="utf-8") as logfile:
             logfile.write(f"## Status execute {folder}\n")
+                   
             
-    """
-    Listed Files Test
-    """        
-            
-    files = sorted(
+    folder = sorted(
         (int(f.name.split("_")[1].split(".")[0]), f) for f in directory.iterdir()
-        if f.is_file()
+        if f.is_dir()
     )
             
-    graph_files = [fdir for _, fdir in files]
+    graph_folder : list[Path] = [fdir for _, fdir in folder]
 
-    if not graph_files:
-        print(f"No graph files found in {directory}")
+    if not graph_folder:
+        print(f"No graph folder found in {directory}")
         return
     
-    for file in graph_files:
-        try:
+    for folder in graph_folder:
+        files = sorted(
+            (int(f.name.split("_")[2].split(".")[0]), f) for f in folder.iterdir()
+            if f.is_file()
+        )
+        file_path : list[Path] = [file_path for _, file_path in files]
+        print("Start: folder", folder.name)
+        
+        data : list[dict] = list()
+        for file in file_path:
+            #try:
             model = HybridModel.from_file(str(file))
             model.set_middle_tao()
-            tao = model.get_tao()
             
             snaphot = model.snapshot()
             n_vertex = len(snaphot["nodes"]) 
             n_edges = len(snaphot["edges"])
             tao = model.get_tao()
-            n_steps = None
+                
+            start_time = time.perf_counter()
+            steps = model.find_consensus_steps(EPS)
+            end_time = time.perf_counter()
+
+            n_file = int(file.name.split("_")[2].split(".")[0])
+            print(f"End test: {n_file + 1}/{len(file_path)}")
             
-            execution_times = []
+            execution_time = end_time - start_time
 
-            print("Start:", file.name)
+            data.append({
+                "n_verte_graph" : n_vertex,
+                "n_edges_graph" : n_edges,
+                "n_file" : n_file,
+                "tao" : tao,
+                "execution_time" : execution_time,
+                "build_alpha_steps" : len(steps["build_alpha"]),
+                "build_alpha_communications" : reduce(lambda acc, t : acc + len(t), steps["build_alpha"], 0),
+                "build_tao_steps" : len(steps["build_tao"]),
+                "build_tao_communications" : reduce(lambda acc, t : acc + len(t), steps["build_tao"], 0),
+                "copy_all_steps" : len(steps["copy_all"]),
+                "copy_all_communications" : reduce(lambda acc, t : acc + len(t), steps["copy_all"], 0),
+            })
 
-            for i in range(n_replications):
-                
-                start_time = time.perf_counter()
-                n_steps = len(model.find_consensus_steps(EPS))
-                end_time = time.perf_counter()
-                
-                print(f"replication done: {i + 1}/{n_replications}")
-                
-                execution_time = end_time - start_time
-                execution_times.append(execution_time)
-                
-            print("Done!", file.name)
+            """except Exception as e:
+                print(f"{file.name} Error: {e}")
+                error = [{
+                    "name" : file.name,
+                    "error" : e
+                }]
+                with error_report_path.open("a", newline="", encoding="utf-8") as csvfile:
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames_error)
+                    writer.writerows(error)"""
 
-            with report_path.open("a", newline="", encoding="utf-8") as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                for i in range(len(execution_times)):
-                    result = {
-                        "n_verte_graph" : n_vertex,
-                        "n_edges_graph" : n_edges,
-                        "replication" : i,
-                        "tao" : tao,
-                        "execution_time" : execution_times[i],
-                        "steps_to_consensus" : n_steps
-                    }
-                    writer.writerow(result)
+        print("Done!", folder.name)
 
-            with status_execute_path.open("a", newline="", encoding="utf-8") as logfile:
-                logfile.write(f"{file.name} Done!\n")
+        with report_path.open("a", newline="", encoding="utf-8") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writerows(data)
 
-        except Exception as e:
-            print(f"{file.name} Error: {e}")
-            error = [{
-                "name" : file.name,
-                "error" : e
-            }]
-            with error_report_path.open("a", newline="", encoding="utf-8") as csvfile:
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames_error)
-                writer.writerows(error)
+        with status_execute_path.open("a", newline="", encoding="utf-8") as logfile:
+            logfile.write(f"{file.name} Done!\n")
 
     print("\nReport generated successfully!")
     print("Report location:", report_path)
